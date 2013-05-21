@@ -2856,13 +2856,21 @@ static NSTimeInterval durationToAnimate(CGFloat pointsToAnimate, CGFloat velocit
     
     if (controller) {
         // and finish the transition
+        
+        // Use unsafe reference to self, so that the finishTransition block does not retain self.
+        // Since the block is about to be stored in _finishTransitionBlocks, a retain cycle will be introduced.
+        // The `finishTransitionBlocks` method is responsible for breaking the retain cycle.
+        // However there are circumstances where `finishTransitionBlocks` does not consume and reset the _finishTransitionBlocks ivar.
+        // I (@groue) don't understand if it's a bug in finishTransitionBlocks or not, and if this method should be fixed.
+        // So I (@groue) prefer avoiding any retain cycle.
+        __unsafe_unretained __typeof(self) unsafeSelf = self;
         void(^finishTransition)(void) = ^{
-            UIViewController* parentController = (self.referenceView == self.view) ? self : [[self parentViewController] parentViewController];
+            UIViewController* parentController = (unsafeSelf.referenceView == unsafeSelf.view) ? unsafeSelf : [[unsafeSelf parentViewController] parentViewController];
             if (!parentController)
-                parentController = self;
+                parentController = unsafeSelf;
             
             [parentController addChildViewController:controller];
-            [controller setViewDeckController:self];
+            [controller setViewDeckController:unsafeSelf];
             afterBlock(controller);
             [controller didMoveToParentViewController:parentController];
         };
